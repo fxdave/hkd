@@ -1,50 +1,52 @@
 use std::env;
-use crate::binding::{Binding, key, run_checked};
-use super::binding::run;
+use crate::bindings::{run_checked};
+use crate::bindings::run;
+use crate::hot_key_daemon::{HotKeyDaemonBuilder};
+use crate::bindings::bind as __;
+use crate::display as dpy;
 
 #[allow(non_snake_case)]
 #[allow(unused)]
-pub fn setup_shortcuts() -> Vec<Binding> {
-    let _super = &(key(x11::keysym::XK_Super_L) | key(x11::keysym::XK_Super_R));
-    let shift = &(key(x11::keysym::XK_Shift_L) | key(x11::keysym::XK_Shift_R));
-    let _return = &key(x11::keysym::XK_Return);
-    let alt = &(key(x11::keysym::XK_Alt_L) | key(x11::keysym::XK_Alt_R));
-    let ctrl = &(key(x11::keysym::XK_Control_L) | key(x11::keysym::XK_Control_R));
-    let menu = &key(x11::keysym::XK_Menu);
-    let print = &key(x11::keysym::XK_Print);
-    let escape = &key(x11::keysym::XK_Escape);
-    let space = &key(x11::keysym::XK_space);
-    let XF86XK_MonBrightnessUp = &key(x11::keysym::XF86XK_MonBrightnessUp);
-    let XF86XK_MonBrightnessDown = &key(x11::keysym::XF86XK_MonBrightnessDown);
-    let a = &key(x11::keysym::XK_a);
-    let b = &key(x11::keysym::XK_b);
-    let c = &key(x11::keysym::XK_c);
-    let d = &key(x11::keysym::XK_d);
-    let e = &key(x11::keysym::XK_e);
-    let f = &key(x11::keysym::XK_f);
-    let g = &key(x11::keysym::XK_g);
-    let h = &key(x11::keysym::XK_h);
-    let i = &key(x11::keysym::XK_i);
-    let j = &key(x11::keysym::XK_j);
-    let k = &key(x11::keysym::XK_k);
-    let l = &key(x11::keysym::XK_l);
-    let m = &key(x11::keysym::XK_m);
-    let n = &key(x11::keysym::XK_n);
-    let o = &key(x11::keysym::XK_o);
-    let p = &key(x11::keysym::XK_p);
-    let q = &key(x11::keysym::XK_q);
-    let r = &key(x11::keysym::XK_r);
-    let s = &key(x11::keysym::XK_s);
-    let t = &key(x11::keysym::XK_t);
-    let u = &key(x11::keysym::XK_u);
-    let v = &key(x11::keysym::XK_v);
-    let w = &key(x11::keysym::XK_w);
-    let x = &key(x11::keysym::XK_x);
-    let y = &key(x11::keysym::XK_y);
-    let z = &key(x11::keysym::XK_z);
-    use super::binding::bind as __;
+pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
+    let _super = &(ctx.key(dpy::XK_Super_L) | ctx.key(dpy::XK_Super_R));
+    let shift = &(ctx.key(dpy::XK_Shift_L) | ctx.key(dpy::XK_Shift_R));
+    let _return = &ctx.key(dpy::XK_Return);
+    let alt = &(ctx.key(dpy::XK_Alt_L) | ctx.key(dpy::XK_Alt_R));
+    let ctrl = &(ctx.key(dpy::XK_Control_L) | ctx.key(dpy::XK_Control_R));
+    let menu = &ctx.key(dpy::XK_Menu);
+    let print = &ctx.key(dpy::XK_Print);
+    let escape = &ctx.key(dpy::XK_Escape);
+    let space = &ctx.key(dpy::XK_space);
+    let XF86XK_MonBrightnessUp = &ctx.key(dpy::XF86XK_MonBrightnessUp);
+    let XF86XK_MonBrightnessDown = &ctx.key(dpy::XF86XK_MonBrightnessDown);
+    let a = &ctx.key(dpy::XK_a);
+    let b = &ctx.key(dpy::XK_b);
+    let c = &ctx.key(dpy::XK_c);
+    let d = &ctx.key(dpy::XK_d);
+    let e = &ctx.key(dpy::XK_e);
+    let f = &ctx.key(dpy::XK_f);
+    let g = &ctx.key(dpy::XK_g);
+    let h = &ctx.key(dpy::XK_h);
+    let i = &ctx.key(dpy::XK_i);
+    let j = &ctx.key(dpy::XK_j);
+    let k = &ctx.key(dpy::XK_k);
+    let l = &ctx.key(dpy::XK_l);
+    let m = &ctx.key(dpy::XK_m);
+    let n = &ctx.key(dpy::XK_n);
+    let o = &ctx.key(dpy::XK_o);
+    let p = &ctx.key(dpy::XK_p);
+    let q = &ctx.key(dpy::XK_q);
+    let r = &ctx.key(dpy::XK_r);
+    let s = &ctx.key(dpy::XK_s);
+    let t = &ctx.key(dpy::XK_t);
+    let u = &ctx.key(dpy::XK_u);
+    let v = &ctx.key(dpy::XK_v);
+    let w = &ctx.key(dpy::XK_w);
+    let x = &ctx.key(dpy::XK_x);
+    let y = &ctx.key(dpy::XK_y);
+    let z = &ctx.key(dpy::XK_z);
 
-    vec![
+    ctx.setup_bindings(vec![
         __(_super + { _return | (shift + _return) | (alt + _return) }) >>
             |i| match i {
                 1 => run!("~/.config/bspwm/context-run-urxvt.sh"),
@@ -90,7 +92,7 @@ pub fn setup_shortcuts() -> Vec<Binding> {
                     run_checked(&format!("systemctl --user stop qmenu_hud@{}.service", display)).unwrap();
                 }
             },
-        __(!!menu) >>
+        __(menu.clone()) >>
             "qmenu_hud",
         __(_super + l - {p | l | r}) >>
             |i| {
@@ -120,7 +122,7 @@ pub fn setup_shortcuts() -> Vec<Binding> {
             "killall ffcast || ffcast -s byzanz-record --x=%x --y=%y --width=%w --height=%h ~/Pictures/recorded_region.gif",
         __(_super + print) >>
             "if [ $(pgrep xflux) ]; then killall xflux; else xflux -l 47.0963692 -g 17.9094899; fi",
-        __(!!print) >>
+        __(print.clone()) >>
             "flameshot gui",
 
         //xf86 backlight
@@ -128,5 +130,5 @@ pub fn setup_shortcuts() -> Vec<Binding> {
             "/usr/bin/night inc",
         __(_super + XF86XK_MonBrightnessDown) >>
             "/usr/bin/night dec",
-    ]
+    ])
 }
