@@ -1,5 +1,7 @@
+use xcb::Keysym;
+
 use super::AST;
-use crate::{bindings::run, hot_key_daemon::HotKeyDaemon, display};
+use crate::{bindings::run, display, hot_key_daemon::HotKeyDaemon};
 use std::ops::Shr;
 
 pub struct Binding {
@@ -8,7 +10,12 @@ pub struct Binding {
 }
 
 impl Binding {
-    fn handle_event(&mut self, event: display::DisplayServerEvent) {
+    /// get all registered keys
+    pub fn get_keys(&self) -> Vec<Keysym> {
+        vec![]
+    }
+    /// process event
+    pub fn handle_event(&mut self, hkd: &mut HotKeyDaemon, event: display::DisplayServerEvent) {
         // TODO: call "callback"
     }
     fn then(mut self, f: impl FnMut(usize, &mut HotKeyDaemon) + 'static) -> Self {
