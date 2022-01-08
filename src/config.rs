@@ -1,13 +1,14 @@
 use std::env;
 use crate::bindings::{run_checked};
 use crate::bindings::run;
-use crate::hot_key_daemon::{HotKeyDaemonBuilder};
+use crate::hot_key_daemon::{HotKeyDaemonBuilder, HotKeyDaemon};
 use crate::bindings::bind as __;
 use crate::display as dpy;
 
 #[allow(non_snake_case)]
 #[allow(unused)]
 pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
+    let esc = &ctx.key(dpy::XK_Escape);
     let _super = &(ctx.key(dpy::XK_Super_L) | ctx.key(dpy::XK_Super_R));
     let shift = &(ctx.key(dpy::XK_Shift_L) | ctx.key(dpy::XK_Shift_R));
     let _return = &ctx.key(dpy::XK_Return);
@@ -47,8 +48,11 @@ pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
     let z = &ctx.key(dpy::XK_z);
 
     ctx.setup_bindings(vec![
+        __(esc.clone()) >> |_, ctx: &mut HotKeyDaemon| {
+            ctx.reset_all_bindings();
+        },
         __(_super + { _return | (shift + _return) | (alt + _return) }) >>
-            |i| match i {
+            |i, ctx: &mut HotKeyDaemon| match i {
                 1 => run!("~/.config/bspwm/context-run-urxvt.sh"),
                 2 => run!(urxvt),
                 3 => run!("~/.config/bspwm/colored-urxvt.sh"),
@@ -57,11 +61,11 @@ pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
         __(ctrl + shift + v) >>
             "copyq menu",
         __(_super + p - {n | o | a | u | d | r}) >>
-            |id| {
-                run!(id, "~/Projects/manage.fish" {"new", "open", "archive", "unarchive", "delete", "run"})
+            |i, ctx: &mut HotKeyDaemon| {
+                run!(i, "~/Projects/manage.fish" {"new", "open", "archive", "unarchive", "delete", "run"})
             },
         __(_super + x - { x | c | (shift+v) | v | (shift+s) | s | (shift+n) | n | (alt+s) | m | f | z | (a - g) | (a - a)}) >> 
-            |i| match i {
+            |i, ctx: &mut HotKeyDaemon| match i {
                 1 => run!(sh "-c" "'xcolor | xclip -sel clip'"),
                 2 => run!(chromium),
                 3 => run!(code),
@@ -79,11 +83,11 @@ pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
                 _ => unimplemented!(),
             },
         __(_super + n) >>
-            |_| {
+            |_, ctx: &mut HotKeyDaemon| {
                 run!(EDITOR=micro urxvt "-e" nnn);
             },
         __(shift + menu) >>
-            |_| {
+            |_, ctx: &mut HotKeyDaemon| {
                 let display = env::var("DISPLAY").expect("DISPLAY should be set");
                 let hud_is_active = run_checked(&format!("systemctl --user is-active qmenu_hud@{}.service", display)).is_ok();
                 if hud_is_active {
@@ -95,12 +99,12 @@ pub fn setup_bindings(ctx: &mut HotKeyDaemonBuilder) {
         __(menu.clone()) >>
             "qmenu_hud",
         __(_super + l - {p | l | r}) >>
-            |i| {
+            |i, ctx: &mut HotKeyDaemon| {
                 run!(i, systemctl {poweroff,suspend,reboot})
             },
 
         __(_super + c - { n | (shift + n) | (a-a) | (a-j) | (a-s-d) | (a-s-l) | (a-s-m) | w | (k-u) | (k-h) }) >>
-            |i| {
+            |i, ctx: &mut HotKeyDaemon| {
                 match i {
                     1 => run!(urxvt "-e" nmtui),
                     2 => run!("nm-connection-editor"),

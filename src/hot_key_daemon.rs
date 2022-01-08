@@ -19,6 +19,10 @@ impl HotKeyDaemon {
             EventHandling::Replay
         }))
     }
+
+    pub fn reset_all_bindings(&mut self) {
+
+    }
 }
 
 /// Grab the required resources and builds a daemon that can be started.
