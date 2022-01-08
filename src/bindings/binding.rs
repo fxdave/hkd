@@ -1,18 +1,19 @@
 use super::AST;
-use crate::bindings::run;
+use crate::{bindings::run, hot_key_daemon::HotKeyDaemon};
 use std::ops::Shr;
 
 pub struct Binding {
     key_tree: AST,
-    callback: Option<Box<dyn FnMut(usize)>>,
+    callback: Option<Box<dyn FnMut(usize, &mut HotKeyDaemon) + 'static>>,
 }
 
 impl Binding {
-    fn then(self, f: impl FnMut(usize)) -> Self {
+    fn then(mut self, f: impl FnMut(usize, &mut HotKeyDaemon) + 'static) -> Self {
+        self.callback = Some(Box::new(f));
         self
     }
     fn then_run(self, path: &str) -> Self {
-        self.then(|_| {
+        self.then(|_, _| {
             run!(path);
         })
     }
@@ -34,7 +35,7 @@ impl Shr<&str> for Binding {
     }
 }
 
-impl<T: FnMut(usize)> Shr<T> for Binding {
+impl<T: FnMut(usize, &mut HotKeyDaemon) + 'static> Shr<T> for Binding {
     type Output = Self;
 
     fn shr(self, rhs: T) -> Self::Output {
