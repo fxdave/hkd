@@ -15,6 +15,16 @@ pub enum Modifier {
     Lock = xcb::MOD_MASK_LOCK as u16,
     Shift = xcb::MOD_MASK_SHIFT as u16,
 }
+pub struct Modifiers {
+    mod1: bool,
+    mod2: bool,
+    mod3: bool,
+    mod4: bool,
+    mod5: bool,
+    control: bool,
+    lock: bool,
+    shift: bool,
+}
 
 pub type Keysym = xcb::Keysym;
 pub type Keycode = xcb::Keycode;

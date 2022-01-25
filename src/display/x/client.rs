@@ -4,7 +4,7 @@ use xcb::{
 use xcb_util::keysyms::KeySymbols;
 
 use crate::display::{
-    client::{DisplayServerEvent, GrabError},
+    client::{DisplayServerEvent as Event, GrabError},
     Button, DisplayServerClient, EventHandling, Keycode, Keysym,
 };
 
@@ -46,56 +46,28 @@ impl X11Client {
             println!("mapping notify {:?} {:?}", e.request(), e.count());
         }
     }
+}
 
-    /// subscribe to key events
-    pub fn grab_keycode_checked(
-        &mut self,
-        keycode: xcb::Keycode,
-        modifiers: u16,
-    ) -> Result<(), GrabError<xcb::Keycode>> {
-        xcb::xproto::grab_key(
-            &self.conn,
-            true,
-            self.root,
-            modifiers,
-            keycode,
-            xcb::GRAB_MODE_ASYNC as u8,
-            xcb::GRAB_MODE_SYNC as u8,
-        )
-        .request_check()
-        .map(|_| {
-            println!("grab key {:?} {:?} ", keycode, modifiers);
-        })
-        .map_err(|reply_error| GrabError {
-            details: fetch_error(reply_error),
-            event_type: "key",
-            value: keycode,
-            modifiers: modifiers,
-        })
-    }
-
-    fn wait_for_event(&mut self) -> Option<(DisplayServerEvent, u8)> {
+impl<'a> DisplayServerClient for X11Client {
+    fn wait_for_event(&mut self) -> Option<Event> {
         self.conn.wait_for_event().and_then(|evt| {
             let event_type: u8 = evt.response_type();
             match event_type {
                 xcb::KEY_PRESS => {
                     let event: &KeyPressEvent = unsafe { cast_event(&evt) };
-                    Some((DisplayServerEvent::KeyPress(event.detail()), event_type))
+                    Some(Event::KeyPress(event.detail()))
                 }
                 xcb::KEY_RELEASE => {
                     let event: &KeyReleaseEvent = unsafe { cast_event(&evt) };
-                    Some((DisplayServerEvent::KeyRelease(event.detail()), event_type))
+                    Some(Event::KeyRelease(event.detail()))
                 }
                 xcb::BUTTON_PRESS => {
                     let event: &ButtonPressEvent = unsafe { cast_event(&evt) };
-                    Some((DisplayServerEvent::ButtonPress(event.detail()), event_type))
+                    Some(Event::ButtonPress(event.detail()))
                 }
                 xcb::BUTTON_RELEASE => {
                     let event: &ButtonReleaseEvent = unsafe { cast_event(&evt) };
-                    Some((
-                        DisplayServerEvent::ButtonRelease(event.detail()),
-                        event_type,
-                    ))
+                    Some(Event::ButtonRelease(event.detail()))
                 }
                 // when the user changes keyboard layout
                 xcb::MAPPING_NOTIFY => {
@@ -110,15 +82,14 @@ impl X11Client {
             }
         })
     }
-}
 
-impl DisplayServerClient for X11Client {
-    fn release_event(&mut self, event_type: u8, replay_event: bool) {
-        let mode = match (event_type, replay_event) {
-            (xcb::KEY_PRESS | xcb::KEY_RELEASE, true) => xcb::ALLOW_REPLAY_KEYBOARD,
-            (xcb::KEY_PRESS | xcb::KEY_RELEASE, false) => xcb::ALLOW_SYNC_KEYBOARD,
-            (xcb::BUTTON_PRESS | xcb::BUTTON_RELEASE, true) => xcb::ALLOW_REPLAY_POINTER,
-            (xcb::BUTTON_PRESS | xcb::BUTTON_RELEASE, false) => xcb::ALLOW_SYNC_POINTER,
+    fn release_event(&mut self, event: Event, handling: EventHandling) {
+        use EventHandling::{Hide, Replay};
+        let mode = match (event, handling) {
+            (Event::KeyPress(_) | Event::KeyRelease(_), Replay) => xcb::ALLOW_REPLAY_KEYBOARD,
+            (Event::KeyPress(_) | Event::KeyRelease(_), Hide) => xcb::ALLOW_SYNC_KEYBOARD,
+            (Event::ButtonPress(_) | Event::ButtonRelease(_), Replay) => xcb::ALLOW_REPLAY_POINTER,
+            (Event::ButtonPress(_) | Event::ButtonRelease(_), Hide) => xcb::ALLOW_SYNC_POINTER,
             _ => {
                 // only keyboard and pointer events could be allowed
                 return;
@@ -128,21 +99,48 @@ impl DisplayServerClient for X11Client {
         self.conn.flush();
     }
 
+    /// subscribe to key events
+    fn grab_keycode_checked(
+        &mut self,
+        keycode: xcb::Keycode,
+        modifiers: u16,
+    ) -> Result<xcb::Keycode, GrabError<xcb::Keycode>> {
+        xcb::xproto::grab_key(
+            &self.conn,
+            true,
+            self.root,
+            modifiers,
+            keycode,
+            xcb::GRAB_MODE_ASYNC as u8,
+            xcb::GRAB_MODE_SYNC as u8,
+        )
+        .request_check()
+        .map(|_| {
+            println!("grab key {:?} {:?} ", keycode, modifiers);
+            keycode
+        })
+        .map_err(|reply_error| GrabError {
+            details: fetch_error(reply_error),
+            event_type: "key",
+            value: keycode,
+            modifiers: modifiers,
+        })
+    }
+
     fn grab_keysym_checked(
         &mut self,
         keysym: Keysym,
         modifiers: u16,
-    ) -> Result<(), Vec<GrabError<Keycode>>> {
+    ) -> (Vec<Keycode>, Vec<GrabError<Keycode>>) {
         let keycodes: Vec<_> = self.key_symbol_tool().get_keycode(keysym).collect();
-        let errors: Option<Vec<GrabError<xcb::Keycode>>> = keycodes
-            .into_iter()
-            .map(|keycode| self.grab_keycode_checked(keycode, modifiers).err())
-            .collect();
-        if let Some(errors) = errors {
-            Err(errors)
-        } else {
-            Ok(())
-        }
+        let (oks, errs): (Vec<_>, Vec<_>) = keycodes
+            .iter()
+            .map(|keycode| self.grab_keycode_checked(*keycode, modifiers))
+            .partition(|r| r.is_ok());
+        (
+            oks.into_iter().filter_map(|r| r.ok()).collect(),
+            errs.into_iter().filter_map(|r| r.err()).collect()
+        )
     }
 
     fn grab_button_checked(
@@ -176,15 +174,6 @@ impl DisplayServerClient for X11Client {
 
     fn flush(&mut self) {
         self.conn.flush();
-    }
-
-    fn subscribe(&mut self, mut callback: Box<dyn FnMut(DisplayServerEvent) -> EventHandling>) {
-        loop {
-            if let Some((event, event_type)) = self.wait_for_event() {
-                let replay_event = callback(event).into();
-                self.release_event(event_type, replay_event)
-            }
-        }
     }
 }
 

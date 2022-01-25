@@ -7,16 +7,26 @@ use super::{Keycode, Button, Keysym};
 ///
 /// In case of other display servers we will see how will this fit.
 pub trait DisplayServerClient {
+    /// get next event
+    fn wait_for_event(&mut self) -> Option<DisplayServerEvent>;
+
     /// let other clients get the event
     /// this must be called after every event
-    fn release_event(&mut self, event_type: u8, replay_event: bool);
+    fn release_event(&mut self, event: DisplayServerEvent, handling: EventHandling);
 
     /// subscribe to key events
     fn grab_keysym_checked(
         &mut self,
         keysym: Keysym,
         modifiers: u16,
-    ) -> Result<(), Vec<GrabError<Keycode>>>;
+    ) -> (Vec<Keycode>, Vec<GrabError<Keycode>>);
+
+    /// subscribe to key events
+    fn grab_keycode_checked(
+        &mut self,
+        keysym: Keycode,
+        modifiers: u16,
+    ) -> Result<Keycode, GrabError<Keycode>>;
 
     /// subscribe to pointer events
     fn grab_button_checked(
@@ -27,28 +37,9 @@ pub trait DisplayServerClient {
 
     /// apply changes
     fn flush(&mut self);
-
-    /// start event loop
-    fn subscribe(&mut self, callback: Box<dyn FnMut(DisplayServerEvent) -> EventHandling>);
-
-    /// subscribe to key events by keysym like x11::keysym::XK_4 for the key 4
-    fn grab_keysym(&mut self, keysym: Keysym, modifiers: u16) {
-        match self.grab_keysym_checked(keysym, modifiers) {
-            Ok(_) => {}
-            Err(e) => println!("{:?}", e),
-        }
-    }
-
-    /// subscribe to mouse button events like xcb::BUTTON_INDEX_2 for middle mouse button
-    fn grab_button(&mut self, button: Button, modifiers: u16) {
-        match self.grab_button_checked(button, modifiers) {
-            Ok(_) => {}
-            Err(e) => println!("{}", e),
-        }
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum DisplayServerEvent {
     KeyRelease(Keycode),
     KeyPress(Keycode),
